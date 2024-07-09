@@ -32,21 +32,22 @@ const NotcursesErrors = error{
   // _ = supported_styles | palette_size;
   // _ = canfade or canchangecolor or cantruecolor;
 
+var ncStruct: ?*nc.struct_notcurses = null;
+var ncStdplane: ?*nc.struct_ncplane = null;
+
+fn init(ncOptions: ?*const nc.struct_notcurses_options) NotcursesErrors!void {
+  ncStruct = nc.notcurses_init(ncOptions, nc.stdout) orelse return NotcursesErrors.InitError;
+  ncStdplane = nc.notcurses_stdplane(ncStruct) orelse return NotcursesErrors.StdPlaneIsNull;
+}
+fn deinit() NotcursesErrors!void {
+  if (nc.notcurses_stop(ncStruct) != 0) return NotcursesErrors.DeinitError;
+}
+
 const NotcursesUI = struct {
   options: *Options.InterfaceOptions,
 
   const Self = @This();
 
-  var ncStruct: ?*nc.struct_notcurses = null;
-  var ncStdplane: ?*nc.struct_ncplane = null;
-
-  fn init(ncOptions: ?*const nc.struct_notcurses_options) NotcursesErrors!void {
-    ncStruct = nc.notcurses_init(ncOptions, nc.stdout) orelse return NotcursesErrors.InitError;
-    ncStdplane = nc.notcurses_stdplane(ncStruct) orelse return NotcursesErrors.StdPlaneIsNull;
-  }
-  fn deinit() NotcursesErrors!void {
-    if (nc.notcurses_stop(ncStruct) != 0) return NotcursesErrors.DeinitError;
-  }
 
 
   fn print(self: *Self) !void{

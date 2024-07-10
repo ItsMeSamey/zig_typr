@@ -20,10 +20,17 @@ test nc {
 
 /// Error union returned by nost functions
 const NotcursesErrors = error{
+  /// Initialization and stuff
   InitError,
   StdPlaneIsNull,
-  ReparentFailed,
   PlaneCreationFailed,
+
+  /// Regarding everything in between
+  PutstrError,
+  RenderError,
+  RasterizeError,
+
+  /// Deinitialization and stuff
   DeinitError,
 };
 
@@ -35,15 +42,13 @@ const NotcursesErrors = error{
   // _ = supported_styles | palette_size;
   // _ = canfade or canchangecolor or cantruecolor;
 
-/// the main notcurses struct
+/// The main notcurses struct
 var ncStruct: ?*nc.struct_notcurses = null;
 /// The standard plane
 var ncStdplane: ?*nc.struct_ncplane = null;
 
-/// the Header Plane, to display typing speed/stats etc.
-var ncHeaderPlane: ?*nc.struct_ncplane = null;
-/// the Plance on which the words appear
-var ncTypingPlane: ?*nc.struct_ncplane = null;
+/// The Top plane containing stats and typing area
+var TypingPlane: ?*nc.struct_ncplane = null;
 
 /// Initialize notcurses with given options
 /// use null to Initialize with defaults
@@ -51,24 +56,13 @@ pub fn init(ncOptions: ?*const nc.struct_notcurses_options) NotcursesErrors!void
   ncStruct = nc.notcurses_core_init(ncOptions, nc.stdout) orelse return NotcursesErrors.InitError;
   ncStdplane = nc.notcurses_stdplane(ncStruct) orelse return NotcursesErrors.StdPlaneIsNull;
 
-  ncHeaderPlane = nc.ncplane_create(ncStdplane, &.{
+  TypingPlane = nc.ncpile_create(ncStruct, &.{
     .y = 0, .x = 0,
-    .rows = 1, .cols = 0,
-    .margin_b = 0, .margin_r = 0,
-    .name = null,
-    .resizecb = null,
-    .flags = nc.NCPLANE_OPTION_MARGINALIZED | nc.NCPLANE_OPTION_AUTOGROW,
-  }) orelse return NotcursesErrors.PlaneCreationFailed;
-
-  // ncHeaderPlane = nc.ncplane_reparent(ncHeaderPlane, ncHeaderPlane) orelse return NotcursesErrors.ReparentFailed;
-
-  ncTypingPlane = nc.ncplane_create(ncStdplane, &.{
-    .y = 1, .x = 0,
     .rows = 0, .cols = 0,
     .margin_b = 0, .margin_r = 0,
-    .name = null,
+    .name = "The main typing plane",
     .resizecb = null,
-    .flags = nc.NCPLANE_OPTION_MARGINALIZED | nc.NCPLANE_OPTION_VSCROLL,
+    .flags = nc.NCPLANE_OPTION_MARGINALIZED,
   }) orelse return NotcursesErrors.PlaneCreationFailed;
 }
 
@@ -77,33 +71,35 @@ pub fn deinit() NotcursesErrors!void {
   if (nc.notcurses_stop(ncStruct) != 0) return NotcursesErrors.DeinitError;
 }
 
-
+/// The UI struct
 pub const NotcursesUI = struct {
-  options: *Options.InterfaceOptions,
+  /// The options struct that you need to modify in order to 
+  options: Options.InterfaceOptions,
 
   const Self = @This();
 
   pub fn print(self: *Self, str: [*:0]const u8) !void{
     _ = self;
     _ = str;
-    if (0 != nc.ncplane_putstr(ncTypingPlane, "HI, Dude")) return ;
-    _ = nc.ncpile_render(ncHeaderPlane);
+    if (0 > nc.ncplane_putstr(TypingPlane, "HI, Dude")) return NotcursesErrors.PutstrError;
+    if (0 != nc.ncpile_render(TypingPlane)) return NotcursesErrors.RenderError;
+    if (0 != nc.ncpile_rasterize(TypingPlane)) return NotcursesErrors.RasterizeError;
     std.time.sleep(1000_000_000*1);
+    std.time.sleep(1000_000_000*1);
+  }
+
+  pub fn changeOptions(new: Options.InterfaceOptions) NotcursesErrors!void{
+    _ = new;
   }
 };
 
 test NotcursesUI {
+  var options: Options.InterfaceOptions = .{ .allocator = null, };
+  var ui = NotcursesUI{&options};
+
   init(null) catch undefined;
 
-  var options: Options.InterfaceOptions = .{.allocator = null, };
-  var ui = NotcursesUI{&options};
-  var bi = NotcursesUI{&options};
-
-  try bi.print();
-
-  std.testing.expect(0 == nc.ncplane_putstr(ncTypingPlane, "Hi mann"));
-  std.testing.expect(0 == nc.notcurses_render(ncStruct));
-
+  try ui.print();
   try ui.deinit();
 }
 

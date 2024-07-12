@@ -1,6 +1,13 @@
-const std = @import("std");
-const Options = @import("options.zig");
+//! The UI struct
 
+/// The options struct that you need to modify in order to 
+options: Options.InterfaceOptions,
+wordPool: ?[][*:0]u8 = null,
+
+const Self = @This();
+const std = @import("std");
+
+ z
 /// Import the notcurses headers
 pub const nc = @cImport({
   @cDefine("_GNU_SOURCE", {});
@@ -34,14 +41,6 @@ const NotcursesErrors = error{
   DeinitError,
 };
 
-  // const supported_styles = nc.notcurses_supported_styles(win);
-  // const palette_size = nc.notcurses_palette_size(win);
-  // const canfade = nc.notcurses_canfade(win);
-  // const canchangecolor = nc.notcurses_canchangecolor(win);
-  // const cantruecolor = nc.notcurses_cantruecolor(win);
-  // _ = supported_styles | palette_size;
-  // _ = canfade or canchangecolor or cantruecolor;
-
 /// The main notcurses struct
 var ncStruct: ?*nc.struct_notcurses = null;
 /// The standard plane
@@ -71,31 +70,23 @@ pub fn deinit() NotcursesErrors!void {
   if (nc.notcurses_stop(ncStruct) != 0) return NotcursesErrors.DeinitError;
 }
 
-/// The UI struct
-pub const NotcursesUI = struct {
-  /// The options struct that you need to modify in order to 
-  options: Options.InterfaceOptions,
+pub fn print(self: *Self, str: [*:0]const u8) !void{
+  _ = self;
+  _ = str;
+  if (0 > nc.ncplane_putstr(TypingPlane, "HI, Dude")) return NotcursesErrors.PutstrError;
+  if (0 != nc.ncpile_render(TypingPlane)) return NotcursesErrors.RenderError;
+  if (0 != nc.ncpile_rasterize(TypingPlane)) return NotcursesErrors.RasterizeError;
+  std.time.sleep(1000_000_000*1);
+  std.time.sleep(1000_000_000*1);
+}
 
-  const Self = @This();
+pub fn changeOptions(new: Options.InterfaceOptions) NotcursesErrors!void{
+  _ = new;
+}
 
-  pub fn print(self: *Self, str: [*:0]const u8) !void{
-    _ = self;
-    _ = str;
-    if (0 > nc.ncplane_putstr(TypingPlane, "HI, Dude")) return NotcursesErrors.PutstrError;
-    if (0 != nc.ncpile_render(TypingPlane)) return NotcursesErrors.RenderError;
-    if (0 != nc.ncpile_rasterize(TypingPlane)) return NotcursesErrors.RasterizeError;
-    std.time.sleep(1000_000_000*1);
-    std.time.sleep(1000_000_000*1);
-  }
-
-  pub fn changeOptions(new: Options.InterfaceOptions) NotcursesErrors!void{
-    _ = new;
-  }
-};
-
-test NotcursesUI {
+test Self {
   var options: Options.InterfaceOptions = .{ .allocator = null, };
-  var ui = NotcursesUI{&options};
+  var ui = Self{&options};
 
   init(null) catch undefined;
 

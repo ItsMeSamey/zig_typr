@@ -1,3 +1,15 @@
+
+/// Number of words that are on screen at once
+wordcount: u32 = 32,
+behaviourBackspace: BehaviourBackspace = .mistake,
+behaviourNavigation: BehaviourNavigation = .none,
+behaviourTyping: BehaviourTyping = .append,
+behaviourLesson: BehaviourLesson = .normal,
+
+/// gracePeriod that is used by Timing Behaviour
+gracePeriod: f32 = 0.5,
+behaviourTiming: BehaviourTiming = .graceful,
+
 const std = @import("std");
 
 /// Enum for how the Backspace key (<BS>) behaves
@@ -50,18 +62,4 @@ pub const BehaviourTiming = enum {
 
 // const BehaviourForgive = enum {
 // };
-
-/// Options to dectate interface's behaviour
-pub const InterfaceOptions = struct {
-  allocator: ?*std.mem.Allocator,
-  /// Number of words that are on screen at once
-  wordcount: u32 = 32,
-  behaviourBackspace: BehaviourBackspace = .mistake,
-  behaviourNavigation: BehaviourNavigation = .none,
-  behaviourTyping: BehaviourTyping = .append,
-  behaviourLesson: BehaviourLesson = .normal,
-  /// gracePeriod that is used by Timing Behaviour
-  gracePeriod: f32 = 0.5,
-  behaviourTiming: BehaviourTiming = .graceful,
-};
 

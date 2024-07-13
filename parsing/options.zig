@@ -17,8 +17,6 @@ pub const BehaviourBackspace = enum {
   never,
   /// Backspace deletes mistakes only right before the cursor
   mistake,
-  /// Backspace deletes mistakes, wraps to last mistake
-  skipToMistake,
   /// Backspace deletes last word always
   always,
 };

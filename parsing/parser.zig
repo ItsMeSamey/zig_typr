@@ -7,10 +7,8 @@ getWord: fn () []u8,
 _original: ListU8,
 /// The array we use for coloring
 _color: ListColor,
-/// Till Where the color should be applied to
-_at: u16 = 0,
 /// Where the cursor should be
-_cursor: u16 = 0,
+_at: u16 = 0,
 /// Patches for behaviourTyping = .append
 _patch: ListU8,
 
@@ -23,6 +21,7 @@ const ListU8 = std.ArrayList(u8);
 const ListColor = std.ArrayList(Color);
 /// How to color the screen text
 const Color = enum {
+  normal,
   correct,
   fixed,
 };
@@ -77,7 +76,6 @@ fn processBackspace(self: *Self) void {
 
   switch (self.options.behaviourBackspace) {
     .always => { self._at -= 1; },
-    .skipToMistake => {}, // TODO: implement
     .mistake => { if (self._color[self._at - 1] == .fixed) self._at -= 1; },
     .never => { return; },
   }
@@ -93,9 +91,7 @@ fn processTextInput(self: *Self, input: u8) void {
     switch (self.options.behaviourTyping) {
       .skip => { self._at += 1;  },
       .stop => {},
-      .append => {
-        self._patch.append(input);
-      },
+      .append => { self._patch.append(input); },
     }
   }
 }

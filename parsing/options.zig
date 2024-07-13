@@ -1,4 +1,3 @@
-
 /// Number of words that are on screen at once
 wordcount: u32 = 32,
 behaviourBackspace: BehaviourBackspace = .mistake,

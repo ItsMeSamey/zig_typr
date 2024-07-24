@@ -1,4 +1,5 @@
 // zig run -lc -lnotcurses -lnotcurses-core -lnotcurses-ffi main.zig
+// zig run -lc -lnotcurses-core main.zig
 const std = @import("std");
 const NCUI = @import("interfaces/notcurses.zig");
 const Options = @import("interfaces/options.zig");

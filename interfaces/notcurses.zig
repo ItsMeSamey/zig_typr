@@ -1,15 +1,9 @@
 //! The UI struct
 
-/// The options struct that you need to modify in order to 
-options: Options.InterfaceOptions,
-wordPool: ?[][*:0]u8 = null,
-
-const Self = @This();
 const std = @import("std");
 
- z
 /// Import the notcurses headers
-pub const nc = @cImport({
+const noc = @cImport({
   @cDefine("_GNU_SOURCE", {});
   @cInclude("notcurses/notcurses.h");
   @cInclude("notcurses/nckeys.h");
@@ -19,18 +13,11 @@ pub const nc = @cImport({
   @cUndef("_GNU_SOURCE");
 });
 
-test nc {
-  const testing = std.testing;
-  const win = nc.notcurses_init(null, nc.stdout).?;
-  testing.expect(0 == nc.notcurses_stop(win)) catch unreachable;
-}
-
 /// Error union returned by nost functions
 const NotcursesErrors = error{
   /// Initialization and stuff
   InitError,
   StdPlaneIsNull,
-  PlaneCreationFailed,
 
   /// Regarding everything in between
   PutstrError,
@@ -42,55 +29,36 @@ const NotcursesErrors = error{
 };
 
 /// The main notcurses struct
-var ncStruct: ?*nc.struct_notcurses = null;
+var ncStruct: ?*noc.struct_notcurses = null;
 /// The standard plane
-var ncStdplane: ?*nc.struct_ncplane = null;
-
-/// The Top plane containing stats and typing area
-var TypingPlane: ?*nc.struct_ncplane = null;
+var ncStdplane: ?*noc.struct_ncplane = null;
 
 /// Initialize notcurses with given options
 /// use null to Initialize with defaults
-pub fn init(ncOptions: ?*const nc.struct_notcurses_options) NotcursesErrors!void {
-  ncStruct = nc.notcurses_core_init(ncOptions, nc.stdout) orelse return NotcursesErrors.InitError;
-  ncStdplane = nc.notcurses_stdplane(ncStruct) orelse return NotcursesErrors.StdPlaneIsNull;
-
-  TypingPlane = nc.ncpile_create(ncStruct, &.{
-    .y = 0, .x = 0,
-    .rows = 0, .cols = 0,
-    .margin_b = 0, .margin_r = 0,
-    .name = "The main typing plane",
-    .resizecb = null,
-    .flags = nc.NCPLANE_OPTION_MARGINALIZED,
-  }) orelse return NotcursesErrors.PlaneCreationFailed;
+pub fn init(ncOptions: ?*const noc.struct_notcurses_options) NotcursesErrors!void {
+  ncStruct = noc.notcurses_core_init(ncOptions, noc.stdout) orelse return NotcursesErrors.InitError;
+  ncStdplane = noc.notcurses_stdplane(ncStruct) orelse return NotcursesErrors.StdPlaneIsNull;
 }
 
 /// Deinitialize notcurses, you must call this or terminal will be messed up
 pub fn deinit() NotcursesErrors!void {
-  if (nc.notcurses_stop(ncStruct) != 0) return NotcursesErrors.DeinitError;
+  if (noc.notcurses_stop(ncStruct) != 0) return NotcursesErrors.DeinitError;
 }
 
-pub fn print(self: *Self, str: [*:0]const u8) !void{
-  _ = self;
-  _ = str;
-  if (0 > nc.ncplane_putstr(TypingPlane, "HI, Dude")) return NotcursesErrors.PutstrError;
-  if (0 != nc.ncpile_render(TypingPlane)) return NotcursesErrors.RenderError;
-  if (0 != nc.ncpile_rasterize(TypingPlane)) return NotcursesErrors.RasterizeError;
-  std.time.sleep(1000_000_000*1);
-  std.time.sleep(1000_000_000*1);
+pub fn print(str: [*:0]const u8) !void{
+  if (0 > noc.ncplane_putstr(ncStdplane.?, str)) return NotcursesErrors.PutstrError;
+  if (0 != noc.ncpile_render(ncStdplane.?)) return NotcursesErrors.RenderError;
+  if (0 != noc.ncpile_rasterize(ncStdplane.?)) return NotcursesErrors.RasterizeError;
+  std.time.sleep(1000_000_000);
 }
 
-pub fn changeOptions(new: Options.InterfaceOptions) NotcursesErrors!void{
-  _ = new;
-}
+test {
+  std.debug.print("DONE",.{});
 
-test Self {
-  var options: Options.InterfaceOptions = .{ .allocator = null, };
-  var ui = Self{&options};
-
-  init(null) catch undefined;
-
-  try ui.print();
-  try ui.deinit();
+  try init(null);
+  try print("Hi");
+  try print("How are you");
+  try print("Doing");
+  try deinit();
 }
 

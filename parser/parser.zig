@@ -12,7 +12,7 @@ _color: ListColor,
 _at: u16 = 0,
 
 const std = @import("std");
-const Options = @import("parser_options.zig");
+const Options = @import("options.zig");
 
 const Self = @This();
 /// How to color the screen text

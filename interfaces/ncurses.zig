@@ -5,13 +5,11 @@ const ColorEnum = Parser.Color;
 const Topts = @import("typeops/operations.zig");
 
 const nc = @cImport({
-  @cDefine("_GNU_SOURCE", {});
   @cInclude("ncurses.h");
-  @cUndef("_GNU_SOURCE");
 });
 
 /// Error union returned by most functions
-const NcursesErrors = error{
+pub const NcursesErrors = error{
   /// Initialization and stuff
   unimplemented,
   initscr,
@@ -33,8 +31,8 @@ const NcursesErrors = error{
   DeinitError,
 } || std.mem.Allocator.Error;
 
-const Options = struct {
-  parser: Parser,
+pub const Options = struct {
+  parser: *Parser,
 
   color: Color = Color{},
 
@@ -65,12 +63,13 @@ const Options = struct {
   };
 };
 
-const SparseOptions = Topts.NonOptional(Topts.DeepOptioned(Options));
+pub const SparseOptions = Topts.NonOptional(Topts.DeepOptioned(Options));
 
 
-var OPTIONS: Options = undefined;
+pub var OPTIONS: Options = undefined;
 var WINDOW: *nc.WINDOW = undefined;
 
+/// The main init function
 pub fn init(options: Options) NcursesErrors!void {
   OPTIONS = options;
   nc.ESCDELAY = 0; // DO NOT delay the escape key press
@@ -88,19 +87,29 @@ pub fn init(options: Options) NcursesErrors!void {
       @field(options.color, field.name ++ "Bg"),
     )) return NcursesErrors.init_color;
   }
+
+  try hardRefresh();
 }
 
+/// Deinit ncurses, otherwise the terminal will be messed up
 pub fn deinit() void {
   _ = nc.endwin();
 }
 
+/// Set the options, only sets what is changed
 pub fn setOptions() NcursesErrors!void {
   return NcursesErrors.unimplemented;
 }
 
+/// The main loop
 pub fn process() NcursesErrors!bool {
   const inp = nc.getch();
-  if (nc.ERR == nc.mvprintw(nc.getmaxy(WINDOW) - 1, 0, "%d", inp)) return NcursesErrors.printw;
+  // { // for debugging input
+  //   const y = nc.getcury(WINDOW);
+  //   const x = nc.getcurx(WINDOW);
+  //   if (nc.ERR == nc.mvprintw(nc.getmaxy(WINDOW) - 1, 0, "%d", inp)) return NcursesErrors.printw;
+  //   if (nc.ERR == nc.move(y, x)) return NcursesErrors.move;
+  // }
 
   if (try OPTIONS.parser.processInput(switch (inp) {
     32...126 => |val| @intCast(val), // ascii characters
@@ -147,26 +156,5 @@ inline fn attrSet(color: ColorEnum) NcursesErrors!void {
 
 inline fn put(char: u8) NcursesErrors!void {
   if (nc.ERR == nc.addch(char)) return NcursesErrors.addch;
-}
-
-fn Hi() [] const u8 {
-  return "Hi"[0..];
-}
-
-pub fn main() !void {
-  defer deinit();
-
-  var options = @import("parser/options.zig"){
-    .behaviourTyping = .skip,
-  };
-  try init(Options{
-    .parser = try Parser.create(std.heap.c_allocator, &options, Hi),
-  });
-
-  try hardRefresh();
-
-  while (try process()) {}
-
-  _ = nc.getch();
 }
 

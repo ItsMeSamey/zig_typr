@@ -1,21 +1,48 @@
 // zig run -lc -lnotcurses -lnotcurses-core -lnotcurses-ffi main.zig
 // zig run -lc -lnotcurses-core main.zig
+// zig run -lc -lncurses main.zig
 const std = @import("std");
-const NCUI = @import("interfaces/notcurses.zig");
-const Options = @import("interfaces/options.zig");
+const NC = @import("interfaces/ncurses.zig");
 
-fn interfaces() !void {
-  try NCUI.init(null);
-  var options: Options.InterfaceOptions = .{ .allocator = null, };
-  var ui = NCUI.NotcursesUI{ .options = &options };
-  try ui.print("hlo mann");
+var PARSER: @import("interfaces/parser/parser.zig") = undefined;
+var PARSEROPTIONS: @import("interfaces/parser/options.zig") = .{};
+var RANDOM: std.Random = undefined;
+
+var GENERAOR: union(enum) {
+  word: @import("word_gen/words.zig"),
+} = undefined;
+
+fn gen() []const u8 {
+  return switch(GENERAOR) {
+    .word => |w| w.gen(),
+  };
 }
 
-pub fn main() !void{
-  interfaces() catch |e| {
-    try NCUI.deinit();
-    return e;
+fn init() !void {
+  RANDOM = @import("word_gen/rng.zig").random();
+
+  // https://github.com/ziglang/zig/issues/19832
+  GENERAOR = @TypeOf(GENERAOR){
+    .word = .{
+      .random = RANDOM,
+    }
   };
-  try NCUI.deinit();
+
+  PARSER = try @TypeOf(PARSER).create(std.heap.c_allocator, &PARSEROPTIONS, gen);
+}
+
+pub fn main() !void {
+  try init();
+  try ncursesLoop();
+}
+
+fn ncursesLoop() !void {
+  defer NC.deinit();
+
+  try NC.init(.{
+    .parser = &PARSER,
+  });
+
+  while (try NC.process()) {}
 }
 

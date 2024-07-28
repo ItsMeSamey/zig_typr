@@ -1,8 +1,8 @@
 //! The parser struct
 
-allocator: *std.mem.Allocator,
+allocator: std.mem.Allocator,
 options: *Options,
-getWord: fn () []u8,
+getWord: *const fn () []const u8,
 
 /// The array containing the text to be displayed
 _original: ListU8,
@@ -25,19 +25,20 @@ pub const Color = enum {
 
 const ListU8 = std.ArrayList(u8);
 const ListColor = std.ArrayList(Color);
+const AllocatorError = std.mem.Allocator.Error;
 
 /// Create instance of `This` struct
-pub fn create(allocator: *std.mem.Allocator, options: *Options, getWord: fn () []u8) std.mem.Allocator.Error!Self {
+pub fn create(allocator: std.mem.Allocator, options: *Options, getWord: *const fn () []const u8) AllocatorError!Self {
   var retval: Self = .{
     .allocator = allocator,
     .options = options,
     .getWord = getWord,
-    ._original = try ListU8.init(allocator),
-    ._color = try ListColor.init(allocator),
+    ._original = ListU8.init(allocator),
+    ._color = ListColor.init(allocator),
   };
-  retval._original.ensureTotalCapacity(options.wordcount*32);
-  retval._color.ensureTotalCapacity(options.wordcount*32);
-  retval.populate();
+  try retval._original.ensureTotalCapacity(options.wordcount*32);
+  try retval._color.ensureTotalCapacity(options.wordcount*32);
+  try retval.populate();
   return retval;
 }
 
@@ -55,75 +56,71 @@ fn populate(self: *Self) std.mem.Allocator.Error!void {
     try self._original.append(' ');
   }
 
-  self._original.items[self._original.items.len - 1] = 0;
+  self._original.items.len -= 1;
 }
 
 /// Process input character by character (this currently only supports ascii)
 /// returns true if display needs to be updated
-pub fn processInput(self: *Self, input: u8) bool {
-  defer if (self._at == self._original.items.len - 1) {
-    self.rePopulate();
+pub fn processInput(self: *Self, input: u8) AllocatorError!bool {
+  defer if (self._at == self._original.items.len) {
+    self.rePopulate() catch {};
   };
 
-  return if (input == 0) {
-    self.processBackspace();
-  } else {
-    self.processTextInput(input);
+  return switch (input) {
+    0 => self.processBackspace(),
+    else => self.processTextInput(input),
   };
 }
 
 inline fn processBackspace(self: *Self) bool {
-  if (self._at == 0) {
+  if (self._color.items.len == 0) {
     return false;
   }
-  self._at -= 1;
 
   // For BehaviourTyping = .append
-  if (self._color[self._at] == .mistake) {
-    _ = self._original.orderedRemove(self._at);
+  if (self._color.getLast() == .mistake) {
+    _ = self._original.orderedRemove(self._color.items.len - 1);
+    self._color.items.len -= 1;
+    self._at -= 1;
     return true;
   }
 
   switch (self.options.behaviourBackspace) {
-    .never => {
-      self._at += 1;
-      return false;
-    },
+    .never => { return false; },
     .mistake => {
-      if (self._color[self._at - 1] == .fixed) {
+      if (self._color.getLast() == .fixed) {
         self._color.items.len -= 1;
+        self._at -= 1;
       }
     },
     .always => {
       self._color.items.len -= 1;
+      self._at -= 1;
     },
   }
   return true;
 }
 
-inline fn processTextInput(self: *Self, input: u8) bool {
-  self._at += 1;
-  if (input == self._original[self._at] and (self.options.behaviourTyping != .append or
-      (self._color.items.len != 0  and self._color.items[self._color.items.len - 1] == .mistake))) {
-    self._color.append(.correct);
-    return true;
+inline fn processTextInput(self: *Self, input: u8) AllocatorError!bool {
+  if (input == self._original.items[self._at] and (self.options.behaviourTyping != .append or
+      self._color.items.len == 0 or self._color.getLast() != .mistake)) {
+    try self._color.append(.correct);
+    self._at += 1;
   } else {
     // Next character will be .fixed no matter what (or maybe a .mistake)
-    if (self._color.items.len == self._at - 1) {
-      self._color.append(.fixed);
+    if (self._color.items.len == self._at) {
+      try self._color.append(.fixed);
     }
     switch (self.options.behaviourTyping) {
-      .stop => {
-        self._at -= 1;
-        return false;
-      },
-      .skip => {},
+      .stop => { return false; },
+      .skip => { self._at += 1; },
       .append => {
-        self._color[self._at - 1] = .mistake;
+        try self._original.insertSlice(self._at, &[1]u8{input});
+        self._color.items[self._at] = .mistake;
+        self._at += 1;
       },
     }
   }
-
   return true;
 }
 

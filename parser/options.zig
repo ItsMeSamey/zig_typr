@@ -1,6 +1,6 @@
 /// Number of words that are on screen at once
 wordcount: u32 = 32,
-behaviourBackspace: BehaviourBackspace = .mistake,
+behaviourBackspace: BehaviourBackspace = .never,
 behaviourNavigation: BehaviourNavigation = .none,
 behaviourTyping: BehaviourTyping = .append,
 behaviourLesson: BehaviourLesson = .normal,

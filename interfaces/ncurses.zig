@@ -23,16 +23,19 @@ const NcursesErrors = error{
   init_pair,
 
   /// Regarding everything in between
-  PutstrError,
-  RenderError,
-  RasterizeError,
+  printw,
+  attrset,
+  move,
+  addch,
+  refresh,
 
   /// Deinitialization and stuff
   DeinitError,
-};
+} || std.mem.Allocator.Error;
 
 const Options = struct {
-  // parser: Parser,
+  parser: Parser,
+
   color: Color = Color{},
 
   /// The ncurses color type
@@ -95,14 +98,74 @@ pub fn setOptions() NcursesErrors!void {
   return NcursesErrors.unimplemented;
 }
 
-pub fn poll() void {
+pub fn process() NcursesErrors!bool {
+  const inp = nc.getch();
+  if (nc.ERR == nc.mvprintw(nc.getmaxy(WINDOW) - 1, 0, "%d", inp)) return NcursesErrors.printw;
+
+  if (try OPTIONS.parser.processInput(switch (inp) {
+    32...126 => |val| @intCast(val), // ascii characters
+    263 => 0, // backspace
+    0x1b, 0x3 => return false,
+    else => return true,
+  })) {
+    try hardRefresh();
+  }
+  return true;
+}
+
+fn hardRefresh() NcursesErrors!void {
+  if (nc.ERR == nc.move(1, 0)) return NcursesErrors.move;
+
+  // The colored input
+  for (0.. ,OPTIONS.parser._color.items[0..]) |ind, color| {
+    try attrPut(OPTIONS.parser._original.items[ind], color);
+  }
+  const y = nc.getcury(WINDOW);
+  const x = nc.getcurx(WINDOW);
+
+  // Rest of the stuff
+  if (OPTIONS.parser._original.items.len > OPTIONS.parser._color.items.len) {
+    try attrSet(.normal);
+    for (OPTIONS.parser._original.items[OPTIONS.parser._color.items.len..]) |char| {
+      try put(char);
+    }
+    if (nc.ERR == nc.move(y, x)) return NcursesErrors.move;
+  }
+
+  if (nc.ERR == nc.refresh()) return NcursesErrors.refresh;
+}
+
+inline fn attrPut(char: u8, color: ColorEnum) NcursesErrors!void {
+  try attrSet(color);
+  try put(char);
+}
+
+inline fn attrSet(color: ColorEnum) NcursesErrors!void {
+  const colorPair: c_int = nc.COLOR_PAIR(@as(c_int, @intFromEnum(color))+1);
+  if (nc.ERR == nc.attrset(colorPair)) return NcursesErrors.attrset;
+}
+
+inline fn put(char: u8) NcursesErrors!void {
+  if (nc.ERR == nc.addch(char)) return NcursesErrors.addch;
+}
+
+fn Hi() [] const u8 {
+  return "Hi"[0..];
 }
 
 pub fn main() !void {
   defer deinit();
-  try init(Options{});
 
-  _ = nc.mvprintw(0, 0, "%s", "Heloo");
+  var options = @import("parser/options.zig"){
+    .behaviourTyping = .skip,
+  };
+  try init(Options{
+    .parser = try Parser.create(std.heap.c_allocator, &options, Hi),
+  });
+
+  try hardRefresh();
+
+  while (try process()) {}
 
   _ = nc.getch();
 }

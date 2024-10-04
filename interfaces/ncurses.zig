@@ -123,6 +123,10 @@ pub fn process() NcursesErrors!bool {
 }
 
 fn hardRefresh() NcursesErrors!void {
+  // if (nc.ERR == nc.move(0, 0)) return NcursesErrors.move;
+  // if (OPTIONS.parser._at == 0)
+  // if (nc.printw("%f", @as(f32, )))
+
   if (nc.ERR == nc.move(1, 0)) return NcursesErrors.move;
 
   // The colored input

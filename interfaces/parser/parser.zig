@@ -28,7 +28,7 @@ const ListColor = std.ArrayList(Color);
 const AllocatorError = std.mem.Allocator.Error;
 
 /// Create instance of `This` struct
-pub fn create(allocator: std.mem.Allocator, options: *Options, getWord: *const fn () []const u8) AllocatorError!Self {
+pub fn create(allocator: std.mem.Allocator, options: *Options, comptime getWord: *const fn () []const u8) AllocatorError!Self {
   var retval: Self = .{
     .allocator = allocator,
     .options = options,

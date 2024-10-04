@@ -37,10 +37,10 @@ pub const Options = struct {
   color: Color = Color{},
 
   /// The ncurses color type
-  const NcColor = nc.NCURSES_COLOR_T;
+  pub const NcColor = nc.NCURSES_COLOR_T;
 
   /// The struct for all the colors
-  const Color = struct {
+  pub const Color = struct {
     /// Default color of text
     normal:    NcColor = nc.COLOR_WHITE,
     /// Default color of text background
@@ -81,7 +81,7 @@ pub fn init(options: Options) NcursesErrors!void {
   if (nc.ERR == nc.start_color()) return NcursesErrors.start_color;
   if (nc.ERR == nc.init_color(nc.COLOR_BLACK, 0, 0, 0)) return NcursesErrors.init_color;
 
-  inline for (@typeInfo(ColorEnum).Enum.fields) |field| {
+  inline for (std.meta.fields(ColorEnum)) |field| {
     if (nc.ERR == nc.init_pair(@as(nc.NCURSES_PAIRS_T, field.value+1),
       @field(options.color, field.name),
       @field(options.color, field.name ++ "Bg"),
@@ -92,8 +92,8 @@ pub fn init(options: Options) NcursesErrors!void {
 }
 
 /// Deinit ncurses, otherwise the terminal will be messed up
-pub fn deinit() void {
-  _ = nc.endwin();
+pub fn deinit() !void {
+  if (0 != nc.endwin()) return NcursesErrors.DeinitError;
 }
 
 /// Set the options, only sets what is changed
@@ -130,16 +130,16 @@ fn hardRefresh() NcursesErrors!void {
   if (nc.ERR == nc.move(1, 0)) return NcursesErrors.move;
 
   // The colored input
-  for (0.. ,OPTIONS.parser._color.items[0..]) |ind, color| {
-    try attrPut(OPTIONS.parser._original.items[ind], color);
+  for (0.. ,OPTIONS.parser.color.items[0..]) |ind, color| {
+    try attrPut(OPTIONS.parser.original.items[ind], color);
   }
   const y = nc.getcury(WINDOW);
   const x = nc.getcurx(WINDOW);
 
   // Rest of the stuff
-  if (OPTIONS.parser._original.items.len > OPTIONS.parser._color.items.len) {
+  if (OPTIONS.parser.original.items.len > OPTIONS.parser.color.items.len) {
     try attrSet(.normal);
-    for (OPTIONS.parser._original.items[OPTIONS.parser._color.items.len..]) |char| {
+    for (OPTIONS.parser.original.items[OPTIONS.parser.color.items.len..]) |char| {
       try put(char);
     }
     if (nc.ERR == nc.move(y, x)) return NcursesErrors.move;

@@ -2,52 +2,46 @@
 // zig run -lc -lncurses main.zig
 const std = @import("std");
 const NC = @import("interfaces/ncurses.zig");
-
 const Parser = @import("interfaces/parser/parser.zig");
+const Generator = union(enum) {
+  word: WordGen,
 
-var parser: Parser = undefined;
-var parserOptions: @import("interfaces/parser/options.zig") = .{};
-var random: std.Random = undefined;
-
-const Generaors = union(enum) {
-  word: @import("word_gen/words.zig"),
+  const WordGen = @import("word_gen/genWords.zig").GetWordGen(.{});
 };
 
-var generaor: Generaors = undefined;
+var parserOptions: @import("interfaces/parser/options.zig") = .{};
+var parser: Parser = undefined;
+var generaor: Generator = undefined;
 
 fn gen() []const u8 {
   return switch(generaor) {
-    .word => |w| w.gen(),
+    .word => generaor.word.gen(),
   };
 }
 
 /// the default initialization
 fn init() !void {
-  random = @import("word_gen/rng.zig").random();
-
   // https://github.com/ziglang/zig/issues/19832
-  generaor = Generaors{
-    .word = .{
-      .random = random,
-    }
+  generaor = Generator{
+    .word = Generator.WordGen.default(),
   };
 
-  parser = try Parser.create(std.heap.c_allocator, &parserOptions, gen);
-}
-
-pub fn main() !void {
-  try init();
-  try ncursesLoop();
+  parser = try Parser.init(std.heap.c_allocator, &parserOptions, gen);
 }
 
 /// The ncursesLoop
 fn ncursesLoop() !void {
-  defer NC.deinit();
+  defer NC.deinit() catch unreachable;
 
   try NC.init(.{
     .parser = &parser,
   });
 
   while (try NC.process()) {}
+}
+
+pub fn main() !void {
+  try init();
+  try ncursesLoop();
 }
 

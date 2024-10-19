@@ -26,6 +26,7 @@ pub const NcursesErrors = error{
   move,
   addch,
   refresh,
+  wclear,
 
   /// Deinitialization and stuff
   DeinitError,
@@ -104,29 +105,38 @@ pub fn setOptions() NcursesErrors!void {
 /// The main loop
 pub fn process() NcursesErrors!bool {
   const inp = nc.getch();
-  // { // for debugging input
-  //   const y = nc.getcury(WINDOW);
-  //   const x = nc.getcurx(WINDOW);
-  //   if (nc.ERR == nc.mvprintw(nc.getmaxy(WINDOW) - 1, 0, "%d", inp)) return NcursesErrors.printw;
-  //   if (nc.ERR == nc.move(y, x)) return NcursesErrors.move;
-  // }
 
   if (try OPTIONS.parser.processInput(switch (inp) {
     32...126 => |val| @intCast(val), // ascii characters
     263 => 0, // backspace
-    0x1b, 0x3 => return false,
-    else => return true,
-  })) {
-    try hardRefresh();
-  }
+    0x3 => return false, // ctrl+c
+    0x1b => return false, // esc
+    else => return true, // continue
+  })) { try hardRefresh(); }
   return true;
 }
 
 fn hardRefresh() NcursesErrors!void {
-  // if (nc.ERR == nc.move(0, 0)) return NcursesErrors.move;
-  // if (OPTIONS.parser._at == 0)
-  // if (nc.printw("%f", @as(f32, )))
+  // clear the WINDOW as (redundant text when backspace is pressed)
+  if(nc.wclear(WINDOW) != 0) return NcursesErrors.wclear;
 
+  if (OPTIONS.parser.original.items.len > nc.COLS - 2) {
+    const cols: usize = @intCast(nc.COLS - 1);
+    for (0..OPTIONS.parser.original.items.len) |i| {
+      if (OPTIONS.parser.original.items[i] == '\n') OPTIONS.parser.original.items[i] = ' ';
+    }
+
+    var prevNext: usize = 0;
+    while (prevNext < OPTIONS.parser.original.items.len - cols) {
+      var next = prevNext + cols;
+      while (next > prevNext and OPTIONS.parser.original.items[next] != ' ') next -= 1;
+
+      if (next != prevNext) OPTIONS.parser.original.items[next] = '\n';
+      prevNext = next;
+    }
+  }
+
+  // Move to second line
   if (nc.ERR == nc.move(1, 0)) return NcursesErrors.move;
 
   // The colored input

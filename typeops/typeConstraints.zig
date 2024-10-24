@@ -1,11 +1,15 @@
 const std = @import("std");
 
-fn IsStruct(comptime T: type) void {
+// Is
+
+fn Is(comptime T: type, comptime tag: std.builtin.TypeId) void {
   const typeInfo = @typeInfo(T);
-  comptime if (typeInfo != .@"struct") {
-    @compileError("Expected a struct but got " ++ std.fmt.comptimePrint("{}", .{ typeInfo }));
+  comptime if (typeInfo != tag) {
+    @compileError("Expected a " ++ @tagName(tag) ++ " but got " ++ std.fmt.comptimePrint("{}", .{ typeInfo }));
   };
 }
+
+// Has
 
 fn HasDecl(comptime T: type, comptime decl: [:0]const u8) void {
   comptime if (!@hasDecl(T, decl)) {
@@ -26,24 +30,51 @@ fn HasFn(comptime T: type, funcName: [:0]const u8, comptime F: type) void {
   };
 }
 
-pub fn ConformsParser(comptime T: type) void {
-  IsStruct(T);
-  HasDecl(T, "process");
-  const processFn = @typeInfo(@TypeOf(@field(T, "process"))).@"fn";
-  if (@typeInfo(processFn.return_type.?).error_union.payload != bool) {
-    @compileError("`process` return type must be `!bool` not " ++ std.fmt.comptimePrint("{}", .{ @typeInfo(processFn.return_type.?) }));
-  }
+// Get
 
-  HasField(T, "text");
-  HasField(T, "color");
+fn GetField(comptime T: type, comptime field: [:0]const u8) type {
+  HasField(T, field);
+
+  const fields = std.meta.fields(T);
+  inline for (fields) |f| {
+    if (std.mem.eql(u8, f.name, field)) {
+      return f.type;
+    }
+  }
+}
+
+fn GetFnReturnType(comptime T: type) type {
+  Is(T, .@"fn");
+
+  return @typeInfo(T).@"fn".return_type.?;
+}
+
+fn GetErrorUnionChild(comptime T: type) type {
+  Is(T, .error_union);
+
+  return @typeInfo(T).error_union.payload;
+}
+
+// Conforms
+
+pub fn ConformsParser(comptime T: type) void {
+  Is(T, .@"struct");
+
+  HasField(GetField(T, "text"), "items");
+  HasField(GetField(T, "color"), "items");
+
+  const processReturnType = GetFnReturnType(@TypeOf(@field(T, "process")));
+  Is(GetErrorUnionChild(processReturnType), .bool);
+  
+  HasFn(T, "process", fn (self: *T, input: u8) processReturnType);
 }
 
 pub fn ConformsGenerator(comptime T: type) void {
-  IsStruct(T);
+  Is(T, .@"struct");
   HasDecl(T, "gen");
 
   HasDecl(T, "Options");
-  IsStruct(@field(T, "Options"));
+  Is(@field(T, "Options"), .@"struct");
 
   const initOptionsType = if (@hasDecl(T, "OptionalOptions")) @field(T, "OptionalOptions") else @field(T, "Options");
   HasFn(T, "init", fn (allocator: std.mem.Allocator, options: initOptionsType) T);

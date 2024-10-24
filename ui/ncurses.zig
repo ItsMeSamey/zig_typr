@@ -105,6 +105,14 @@ pub fn GetUi(Parser: anytype) type {
 
     const Self = @This();
 
+    pub fn init(parser: Parser) !Self {
+      var retval = Self {
+        .parser = parser,
+      };
+      try retval.hardRefresh();
+      return retval;
+    }
+
     /// The main loop
     pub fn process(self: *Self) NcursesErrors!bool {
       const inp = nc.getch();
